@@ -15,7 +15,7 @@ setuptools.setup(
     packages=["import_garmin_connect"],
     entry_points={
         "console_scripts": [
-            "import_garmin_connect = import_garmin_connect.__main__:main"
+            "import-garmin-connect = import_garmin_connect.__main__:main"
         ]
     },
     install_requires=["requests", "influxdb"],
