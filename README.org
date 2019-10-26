@@ -1,0 +1,22 @@
+* Import Garmin Connect data into InfluxDB
+
+Idea taken from [[https://blog.ithasu.org/2019/01/fetching-garmin-data-done/][Ithasu's blog]], converted it to Python and added the writing to
+InfluxDB.
+
+* What it does
+
+Imports various data sources from your [[https://connect.garmin.com/modern/][Garmin Connect]] profile into a InfluxDB database.
+
+* Usage
+
+#+begin_src sh
+import_garmin_connect --user USER --password PASSWORD --profile NAME
+#+end_src
+
+For more detailed arguments see =--help=
+
+* Requirements
+
+- Python 3.7+
+- influxdb
+- requests
