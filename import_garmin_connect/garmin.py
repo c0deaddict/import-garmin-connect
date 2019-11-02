@@ -1,8 +1,8 @@
 import re
 import requests
-from requests.auth import HTTPBasicAuth
 from urllib.parse import urlencode
-from datetime import datetime, timedelta
+from datetime import datetime
+import logging
 
 
 def authenticate(username, password):
@@ -68,9 +68,21 @@ def find_display_name(session):
 
 
 def fetch_data(session, display_name, date, base_url, date_param, extra_params={}):
+    if base_url.endswith("/"):
+        raise ValueError("base_url must not end with a slash")
+
+    if display_name:
+        url = base_url + "/" + display_name
+    else:
+        url = base_url
+
     params = dict(**extra_params)
-    params[date_param] = date.strftime("%Y-%m-%d")
-    url = base_url + display_name + "?" + urlencode(params)
+    if date_param is not None:
+        params[date_param] = date.strftime("%Y-%m-%d")
+    else:
+        url += "/" + date.strftime("%Y-%m-%d")
+    url = url + "?" + urlencode(params)
+    logging.debug("GET " + url)
     return session.get(url).json()
 
 
@@ -79,7 +91,7 @@ def fetch_summary(session, display_name, date):
         session,
         display_name,
         date,
-        base_url="https://connect.garmin.com/modern/proxy/usersummary-service/usersummary/daily/",
+        base_url="https://connect.garmin.com/modern/proxy/usersummary-service/usersummary/daily",
         date_param="calendarDate",
     )
 
@@ -160,7 +172,7 @@ def fetch_activities(session, display_name, date):
         session,
         display_name,
         date,
-        base_url="https://connect.garmin.com/modern/proxy/activitylist-service/activities/fordailysummary/",
+        base_url="https://connect.garmin.com/modern/proxy/activitylist-service/activities/fordailysummary",
         date_param="calendarDate",
     )
 
@@ -192,7 +204,7 @@ def fetch_sleep(session, display_name, date):
         session,
         display_name,
         date,
-        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailySleepData/",
+        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailySleepData",
         date_param="date",
         extra_params={"nonSleepBufferMinutes": 60},
     )
@@ -200,7 +212,7 @@ def fetch_sleep(session, display_name, date):
 
 def convert_sleep(date, data, tags):
     dto = data["dailySleepDTO"]
-    levels = data["sleepLevels"]
+    # levels = data["sleepLevels"]
 
     yield {
         "measurement": "sleep",
@@ -222,7 +234,7 @@ def fetch_steps(session, display_name, date):
         session,
         display_name,
         date,
-        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailySummaryChart/",
+        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailySummaryChart",
         date_param="date",
     )
 
@@ -250,7 +262,7 @@ def fetch_movements(session, display_name, date):
         session,
         display_name,
         date,
-        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailyMovement/",
+        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailyMovement",
         date_param="calendarDate",
     )
 
@@ -260,7 +272,7 @@ def fetch_heartrate(session, display_name, date):
         session,
         display_name,
         date,
-        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailyHeartRate/",
+        base_url="https://connect.garmin.com/modern/proxy/wellness-service/wellness/dailyHeartRate",
         date_param="date",
     )
 
@@ -280,8 +292,49 @@ def convert_heartrate(date, data, tags):
 def fetch_weight(session, display_name, date):
     return fetch_data(
         session,
-        display_name,
-        date,
+        display_name=None,  # no display_name in URL
+        date=date,
         base_url="https://connect.garmin.com/modern/proxy/weight-service/weight/latest",
         date_param="date",
+        extra_params={"ignorePriority": "true"},
     )
+
+
+def convert_weight(date, data, tags):
+    ts = data["timestampGMT"]
+    weight = data["weight"]
+
+    yield {
+        "measurement": "weight",
+        "tags": tags,
+        "time": datetime.utcfromtimestamp(ts / 1000).isoformat() + "Z",
+        "fields": {"weight": weight},
+    }
+
+
+def fetch_hydration(session, display_name, date):
+    return fetch_data(
+        session,
+        display_name=None,  # no display_name in URL
+        date=date,
+        base_url="https://connect.garmin.com/modern/proxy/usersummary-service/usersummary/hydration/allData",
+        date_param=None,  # append date to URL
+    )
+
+
+def convert_hydration(date, data, tags):
+    copy_fields = [
+        "activityIntakeInML",
+        "sweatLossInML",
+        "baseGoalInML",
+        "goalInML",
+        "valueInML",
+        "lastEntryTimestampLocal",
+    ]
+
+    yield {
+        "measurement": "hydration",
+        "tags": tags,
+        "time": date.isoformat(),
+        "fields": {key: data[key] for key in copy_fields},
+    }

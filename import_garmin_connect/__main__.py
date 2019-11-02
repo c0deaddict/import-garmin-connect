@@ -1,6 +1,7 @@
 import argparse
 import traceback
-import sys
+import json
+import logging
 
 from influxdb import InfluxDBClient
 from datetime import datetime, timedelta
@@ -8,7 +9,15 @@ from datetime import datetime, timedelta
 from . import garmin
 
 
-all_sources = ["summary", "activities", "sleep", "steps", "heartrate"]
+all_sources = [
+    "summary",
+    "activities",
+    "sleep",
+    "steps",
+    "heartrate",
+    "weight",
+    "hydration",
+]
 
 
 def main():
@@ -36,16 +45,30 @@ def main():
     parser.add_argument(
         "-s", "--source", action="append", help="Only import these sources"
     )
+    parser.add_argument(
+        "-t",
+        "--test",
+        action="store_true",
+        help="Log measurements and do not write to InfluxDB.",
+    )
+    parser.add_argument("--log", default="INFO", help="Logging level")
 
     args = parser.parse_args()
 
-    influx = InfluxDBClient(host=args.influx_host, port=args.influx_port)
-    influx.switch_database(args.influx_db)
+    # https://docs.python.org/3/howto/logging.html
+    numeric_level = getattr(logging, args.log.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError("Invalid log level: %s" % args.log)
+    logging.basicConfig(level=numeric_level)
 
-    print(f"Authenticating to Garmin as {args.user} ...")
+    if not args.test:
+        influx = InfluxDBClient(host=args.influx_host, port=args.influx_port)
+        influx.switch_database(args.influx_db)
+
+    logging.info(f"Authenticating to Garmin as {args.user} ...")
     session = garmin.authenticate(args.user, args.password)
     display_name = garmin.find_display_name(session)
-    print(f"You have display_name: {display_name}")
+    logging.info(f"You have display_name: {display_name}")
 
     if args.date is None:
         start_date = datetime.now()
@@ -62,14 +85,20 @@ def main():
     for date in (start_date + timedelta(n) for n in range(args.days)):
         for source in sources:
             try:
-                print(f"Importing data about {source} on {date.strftime('%Y-%m-%d')}")
+                logging.info(
+                    f"Importing data about {source} on {date.strftime('%Y-%m-%d')}"
+                )
                 fetcher = getattr(garmin, "fetch_" + source)
                 converter = getattr(garmin, "convert_" + source)
                 data = fetcher(session, display_name, date)
-                points = list(converter(date, data, tags))
-                influx.write_points(points)
+                points = converter(date, data, tags)
+                if not args.test:
+                    influx.write_points(list(points))
+                else:
+                    for p in points:
+                        logging.info(json.dumps(p))
             except:
-                print(f"Error importing from source {source}:")
+                logging.error(f"Error importing from source {source}:")
                 traceback.print_exc()
 
 
