@@ -64,7 +64,7 @@ def authenticate(username, password):
 
 def find_display_name(session):
     response = session.get("https://connect.garmin.com/modern/")
-    return re.search(r'displayName\\":\\\"([^"]*)\\"', response.text).group(1)
+    return re.search(r'displayName\\":\\"([^"]*)\\"', response.text).group(1)
 
 
 def fetch_data(session, display_name, date, base_url, date_param, extra_params={}):
