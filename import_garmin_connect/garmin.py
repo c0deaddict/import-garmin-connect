@@ -24,6 +24,7 @@ def authenticate(username, password):
         "initialFocus": "true",
         "locale": "en_US",
         "locationPromptShown": "true",
+        "mfaRequired": "false",
         "mobile": "false",
         "openCreateAccount": "false",
         "privacyStatementUrl": "https://www.garmin.com/en-US/privacy/connect/",
@@ -31,7 +32,10 @@ def authenticate(username, password):
         "redirectAfterAccountLoginUrl": "https://connect.garmin.com/modern/",
         "rememberMeChecked": "false",
         "rememberMeShown": "true",
+        "rememberMyBrowserChecked": "false",
+        "rememberMyBrowserShown": "false",
         "service": "https://connect.garmin.com/modern/",
+        "showConnectLegalAge": "false",
         "showConnectLegalAge": "false",
         "showPassword": "true",
         "showPrivacyPolicy": "false",
@@ -56,7 +60,7 @@ def authenticate(username, password):
     ticket_response = session.get(
         "https://connect.garmin.com/modern/?ticket=" + ticket,
         headers={"Referer": connect_url},
-        allow_redirects=False,
+        allow_redirects=True,
     )
 
     return session
@@ -304,12 +308,13 @@ def convert_weight(date, data, tags):
     ts = data["timestampGMT"]
     weight = data["weight"]
 
-    yield {
-        "measurement": "weight",
-        "tags": tags,
-        "time": datetime.utcfromtimestamp(ts / 1000).isoformat() + "Z",
-        "fields": {"weight": weight},
-    }
+    if ts is not None and weight is not None:
+        yield {
+            "measurement": "weight",
+            "tags": tags,
+            "time": datetime.utcfromtimestamp(ts / 1000).isoformat() + "Z",
+            "fields": {"weight": weight},
+        }
 
 
 def fetch_hydration(session, display_name, date):
