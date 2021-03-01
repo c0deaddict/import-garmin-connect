@@ -87,7 +87,7 @@ def fetch_data(session, display_name, date, base_url, date_param, extra_params={
         url += "/" + date.strftime("%Y-%m-%d")
     url = url + "?" + urlencode(params)
     logging.debug("GET " + url)
-    return session.get(url).json()
+    return session.get(url, headers={"NK": "NT"}).json()
 
 
 def fetch_summary(session, display_name, date):
